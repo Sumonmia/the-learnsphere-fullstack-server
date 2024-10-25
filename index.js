@@ -8,7 +8,7 @@ const app = express();
 const port = process.env.PORT || 5000;
 
 
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_SECRET}@cluster0.87nis.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -29,6 +29,8 @@ async function run() {
         // creating database and collection
         // const userCollection = client.db("bootcampUsersDB").collection("users");
         const userListCollection = client.db("learnSphereDB").collection("userList");
+        const courseCollection = client.db("learnSphereDB").collection("courses");
+        const purchaseCollection = client.db("learnSphereDB").collection("purchaselogs");
 
         // LearnSphere Database operation start
 
@@ -38,23 +40,182 @@ async function run() {
             const result = await query.toArray();
             res.send(result);
         })
-
         // fetching single user data
-        app.get("/userList/:uid", async (req, res) => {
-            const id = req.params.uid;
-            const query = { userId : id };
+        app.get("/userList/:_id", async (req, res) => {
+            const id = req.params._id;
+            const query = { userId: id };
             const result = await userListCollection.findOne(query);
-            console.log(result);
+            // console.log(result);
             res.send(result);
         })
 
         // fetching data from form fileds and insertion into database 
         app.post("/userList", async (req, res) => {
             const users = req.body;
-            console.log(users);
+            // console.log(users);
             const result = await userListCollection.insertOne(users);
             res.send(result);
         });
+
+        // edit data in table
+        app.put("/userList/:_id", async (req, res) => {
+            const id = req.params._id;
+            const user = req.body;
+            // console.log(id, user);
+
+            // Validate ObjectId
+            if (!ObjectId.isValid(id)) {
+                return res.status(400).send({ message: "Invalid user ID" });
+            }
+
+            const filter = { _id: new ObjectId(id) };
+            const option = { upsert: true };
+
+            const updatedUser = {
+                $set: {
+                    displayName: user.displayName,
+                    phoneNumber: user.phoneNumber,
+                    photoURL: user.photoURL,
+                    address: user.address,
+                },
+            };
+            // const result = await userListCollection.updateOne(
+            //     filter, updatedUser, option);
+            // console.log("Server response is: ", result);
+            // res.send(result);
+
+            try {
+                const result = await userListCollection.updateOne(filter, updatedUser, option);
+
+                if (result.matchedCount === 0) {
+                    return res.status(404).send({ message: "User not found" });
+                }
+
+                console.log("Server response is: ", result);
+                res.send({ message: "User updated successfully", result });
+            } catch (error) {
+                console.error("Error updating user:", error);
+                res.status(500).send({ message: "Failed to update user", error: error.message });
+            }
+
+        })
+
+        // End of user management
+
+        // Start of Course management
+
+        // getting course data from database
+        app.get("/courses", async (req, res) => {
+            const query = courseCollection.find();
+            const result = await query.toArray();
+            res.send(result);
+        })
+
+        // fetching course category data to show in homepage
+        // app.get("/courseCategories", async (req, res) => {
+        //     const query = courseCollection.find();
+        //     const result = await query.toArray();
+        //     res.send(result);
+        // })
+
+
+        // fetching course data for edit
+        app.get("/course/:id", async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) };
+            const result = await courseCollection.findOne(query);
+            // console.log(result);
+            res.send(result);
+        })
+
+        // fetching course data for insertion into database and processing
+        app.post("/courses", async (req, res) => {
+            const courses = req.body;
+            // console.log(courses);
+            const result = await courseCollection.insertOne(courses);
+            res.send(result);
+        });
+
+        // edit course data in table
+        app.put("/course/:id", async (req, res) => {
+            const id = req.params.id;
+            const course = req.body;
+            // console.log(id, course);
+
+            const filter = { _id: new ObjectId(id) };
+            const option = { upsert: true };
+
+            const updatedCourse = {
+                $set: {
+                    title: course.title,
+                    category: course.category,
+                    categoryId: course.categoryId,
+                    image: course.image,
+                    price: course.price,
+                    rating: course.rating,
+                },
+            };
+            const result = await courseCollection.updateOne(
+                filter, updatedCourse, option);
+            // console.log("Server response is: ", result);
+            res.send(result);
+        })
+        // deleting data from table
+        app.delete("/course/:id", async (req, res) => {
+            const id = req.params.id;
+            // console.log(id);
+            const query = { _id: new ObjectId(id) };
+            const result = await courseCollection.deleteOne(query);
+            res.send(result);
+        })
+
+        // Start of Course Category Operationa
+
+        // getting course categories data from database
+        app.get('/courseCategories', async (req, res) => {
+            try {
+                const categories = await courseCollection.aggregate([
+                    {
+                        $group: {
+                            _id: { categoryId: "$categoryId", category: "$category" }
+                        }
+                    },
+                    {
+                        $project: {
+                            _id: 0,
+                            categoryId: "$_id.categoryId",
+                            category: "$_id.category"
+                        }
+                    }
+                ]).toArray();
+
+                res.send(categories);
+            } catch (error) {
+                console.error("Error fetching categories: ", error);
+                res.status(500).send("Failed to fetch categories");
+            }
+        });
+
+        // ---------end-------------
+
+
+        // ---------Start user purchase--------------
+
+        // inserting user's purchase details
+        app.post("/userlogs", async (req, res) => {
+            const userlogs = req.body;
+            console.log(userlogs);
+            const result = await purchaseCollection.insertOne(userlogs);
+            res.send(result);
+        });
+
+        // fetching user purchase logs
+        app.get("/userlogs", async(req, res)=>{
+            const query = purchaseCollection.find();
+            const result = await query.toArray();
+            res.send(result);
+        })
+
 
         // LearnSphere Database operation end
 
