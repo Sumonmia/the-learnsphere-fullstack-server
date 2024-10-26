@@ -31,6 +31,7 @@ async function run() {
         const userListCollection = client.db("learnSphereDB").collection("userList");
         const courseCollection = client.db("learnSphereDB").collection("courses");
         const purchaseCollection = client.db("learnSphereDB").collection("purchaselogs");
+        const categoryCollection = client.db("learnSphereDB").collection("categories");
 
         // LearnSphere Database operation start
 
@@ -100,9 +101,9 @@ async function run() {
 
         })
 
-        // End of user management
+        //---------- End of user management----------
 
-        // Start of Course management
+        // ---------Start of Course management---------
 
         // getting course data from database
         app.get("/courses", async (req, res) => {
@@ -110,14 +111,6 @@ async function run() {
             const result = await query.toArray();
             res.send(result);
         })
-
-        // fetching course category data to show in homepage
-        // app.get("/courseCategories", async (req, res) => {
-        //     const query = courseCollection.find();
-        //     const result = await query.toArray();
-        //     res.send(result);
-        // })
-
 
         // fetching course data for edit
         app.get("/course/:id", async (req, res) => {
@@ -169,34 +162,38 @@ async function run() {
             res.send(result);
         })
 
-        // Start of Course Category Operationa
+        // ---------End of Course Management operations--------
 
-        // getting course categories data from database
-        app.get('/courseCategories', async (req, res) => {
+        // ------------Start of Course Category Operations-------------
+
+        // getting course category data from database
+        app.get("/courseCategories", async (req, res) => {
+            const query = categoryCollection.find();
+            const result = await query.toArray();
+            res.send(result);
+        })
+
+        // Route to get courses by categoryId
+        app.get("/courses/:categoryId", async (req, res) => {
+            const categoryId = req.params.categoryId;
             try {
-                const categories = await courseCollection.aggregate([
-                    {
-                        $group: {
-                            _id: { categoryId: "$categoryId", category: "$category" }
-                        }
-                    },
-                    {
-                        $project: {
-                            _id: 0,
-                            categoryId: "$_id.categoryId",
-                            category: "$_id.category"
-                        }
-                    }
-                ]).toArray();
-
-                res.send(categories);
+                const courses = await courseCollection.find({ categoryId }).toArray();
+                res.json(courses);
             } catch (error) {
-                console.error("Error fetching categories: ", error);
-                res.status(500).send("Failed to fetch categories");
+                console.error("Error fetching courses:", error);
+                res.status(500).send("Internal server error");
             }
         });
 
-        // ---------end-------------
+        // fetching course category data for insertion into database and processing
+        app.post("/courseCategories", async (req, res) => {
+            const categories = req.body;
+            // console.log(courses);
+            const result = await categoryCollection.insertOne(categories);
+            res.send(result);
+        });
+
+        // ---------end of category operations-------------
 
 
         // ---------Start user purchase--------------
@@ -210,72 +207,16 @@ async function run() {
         });
 
         // fetching user purchase logs
-        app.get("/userlogs", async(req, res)=>{
+        app.get("/userlogs", async (req, res) => {
             const query = purchaseCollection.find();
             const result = await query.toArray();
             res.send(result);
         })
 
+        // --------End User Purchase ---------------
 
         // LearnSphere Database operation end
-
-
-
-        // reading data in table
-        // app.get("/users", async(req, res)=>{
-        //     const query = userCollection.find();
-        //     const result = await query.toArray();
-        //     res.send(result);
-        // })
-
-        // fetching data for edit
-        // app.get("/user/:id", async(req, res)=>{
-        //     const id = req.params.id;
-        //     const query = {_id : new ObjectId(id)};
-        //     const result = await userCollection.findOne(query);
-        //     console.log(result);
-        //     res.send(result);
-        // })
-
-        // fetching data for insertion into database and processing
-        // app.post("/users", async(req, res)=>{
-        //     const users = req.body;
-        //     console.log(users);
-        //     const result = await userCollection.insertOne(users);
-        //     res.send(result);
-        // }); 
-
-        // edit data in table
-        // app.put("/user/:id", async(req, res)=>{
-        //     const id = req.params.id;
-        //     const user = req.body;
-        // console.log(id, user);
-
-        //     const filter = { _id : new ObjectId(id)};
-        //     const option = {upsert: true};
-
-        //     const updatedUser = {
-        //         $set: {
-        //             name: user.name,
-        //             email: user.email,
-        //         },
-        //     };
-        //     const result = await userCollection.updateOne(
-        //         filter, updatedUser, option);
-        //         console.log("Server response is: ", result);
-        //     res.send(result);
-        // })
-
-        // deleting data from table
-        // app.delete("/users/:id", async(req, res)=>{
-        //     const id = req.params.id;
-        //     console.log(id);
-        //     const query = {_id : new ObjectId(id)};
-        //     const result = await userCollection.deleteOne(query);
-        //     res.send(result);
-        // })
-
-
+        // LearnSphere Database operation end
 
         // Send a ping to confirm a successful connection
         await client.db("admin").command({ ping: 1 });
