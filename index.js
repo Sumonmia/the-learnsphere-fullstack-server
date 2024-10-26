@@ -80,10 +80,6 @@ async function run() {
                     address: user.address,
                 },
             };
-            // const result = await userListCollection.updateOne(
-            //     filter, updatedUser, option);
-            // console.log("Server response is: ", result);
-            // res.send(result);
 
             try {
                 const result = await userListCollection.updateOne(filter, updatedUser, option);
